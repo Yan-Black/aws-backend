@@ -19,7 +19,7 @@ const dbOptions = {
 const handler = async (event) => {
   const client = new Client(dbOptions);
   await client.connect();
-
+  console.log('getProductsList lambda invoked', `args: ${event}`);
   try {
     const { rows: products } = await client.query('select * from products');
     const { rows: stocks } = await client.query('select * from stocks');

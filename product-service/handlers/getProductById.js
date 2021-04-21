@@ -19,12 +19,15 @@ const dbOptions = {
 const handler = async (event) => {
   const client = new Client(dbOptions);
   await client.connect();
-
+  console.log(
+    'getProductById lambda invoked',
+    `args: ${event['queryStringParameters']}`
+  );
   const { product: id } = event['queryStringParameters'];
 
   try {
     const { rows: product } = await client.query(
-      `select * from products where id=${id}`
+      `select * from products where id='${id}'`
     );
 
     return {
@@ -32,10 +35,10 @@ const handler = async (event) => {
       body: JSON.stringify({ data: product })
     };
   } catch (err) {
-    console.error(
-      'Unexpected error has been occured during connection to the database:',
-      err
-    );
+    return {
+      statusCode: 500,
+      message: `Unexpected error has been occured during connection to the database: ${err}`
+    };
   } finally {
     client.end();
   }
