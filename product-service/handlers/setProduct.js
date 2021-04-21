@@ -53,6 +53,11 @@ const handler = async (event) => {
       rows: [{ id }]
     } = await client.query(selectAll(title, description, price));
 
+    await client.query(
+      `insert into stocks (product_id, count) values
+      ('${id}', '1')`
+    );
+
     return {
       statusCode: 200,
       body: 'new product was created!',
