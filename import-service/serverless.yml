@@ -49,3 +49,10 @@ functions:
           rules:
             - prefix: uploaded/
           existing: true
+  catalogBatchProcess:
+    handler: handler.catalogBatchProcess
+    events:
+      - sqs:
+          batchSize: 5
+          arn:
+            Fn::
