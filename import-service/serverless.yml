@@ -13,13 +13,14 @@ provider:
       statements:
         - Effect: 'Allow'
           Action: 's3:ListBucket'
-          Resource:
-            - 'arn:aws:s3:::aws-task-csv-bucket'
+          Resource: 'arn:aws:s3:::aws-task-csv-bucket'
         - Effect: 'Allow'
-          Action:
-            - 's3:*'
+          Action: 's3:*'
+          Resource: 'arn:aws:s3:::aws-task-csv-bucket/*'
+        - Effect: 'Allow'
+          Action: 'sqs:*'
           Resource:
-            - 'arn:aws:s3:::aws-task-csv-bucket/*'
+            - Fn::GetAtt: [SQSQueue, Arn]
 
   environment:
     host: console-created-instance.c0hjjbisikru.eu-west-1.rds.amazonaws.com
@@ -27,6 +28,15 @@ provider:
     database: console_db
     user: postgres
     password: JUNXjOHlOItsXOmtBH5X
+    SQS_URL:
+      Ref: SQSQueue
+
+resources:
+  Resources:
+    SQSQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: catalogItemsQueue
 
 functions:
   importProductsFile:
@@ -55,4 +65,6 @@ functions:
       - sqs:
           batchSize: 5
           arn:
-            Fn::
+            Fn::GetAtt:
+              - SQSQueue
+              - Arn
