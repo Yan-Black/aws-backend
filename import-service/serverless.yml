@@ -21,6 +21,10 @@ provider:
           Action: 'sqs:*'
           Resource:
             - Fn::GetAtt: [SQSQueue, Arn]
+        - Effect: 'Allow'
+          Action: 'sns:*'
+          Resource:
+            Ref: SNSTopic
 
   environment:
     host: console-created-instance.c0hjjbisikru.eu-west-1.rds.amazonaws.com
@@ -30,6 +34,8 @@ provider:
     password: JUNXjOHlOItsXOmtBH5X
     SQS_URL:
       Ref: SQSQueue
+    SNS_ARN:
+      Ref: SNSTopic
 
 resources:
   Resources:
@@ -37,6 +43,17 @@ resources:
       Type: AWS::SQS::Queue
       Properties:
         QueueName: catalogItemsQueue
+    SNSTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: createProductTopic
+    SNSSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Endpoint: yan.test.aws@gmail.com
+        Protocol: email
+        TopicArn:
+          Ref: SNSTopic
 
 functions:
   importProductsFile:

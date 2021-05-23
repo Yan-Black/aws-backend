@@ -1,4 +1,5 @@
 const { Client } = require('pg');
+const { SNS } = require('aws-sdk');
 const middy = require('middy');
 const { cors } = require('middy/middlewares');
 
@@ -20,6 +21,7 @@ const selectAll = (title, description, price) =>
   `select * from products where title='${title}' and description='${description}' and price='${price}'`;
 
 const handler = async (event) => {
+  const sns = new SNS();
   const client = new Client(dbOptions);
   await client.connect();
 
@@ -40,6 +42,17 @@ const handler = async (event) => {
     await client.query(
       `insert into stocks (product_id, count) values
       ('${id}', '1')`
+    );
+
+    sns.publish(
+      {
+        Subject: 'New product submited',
+        Message: JSON.stringify(product),
+        TopicArn: process.env.SNS_ARN
+      },
+      () => {
+        console.log('Email sended');
+      }
     );
   });
 };
