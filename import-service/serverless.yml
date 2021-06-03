@@ -13,13 +13,18 @@ provider:
       statements:
         - Effect: 'Allow'
           Action: 's3:ListBucket'
-          Resource:
-            - 'arn:aws:s3:::aws-task-csv-bucket'
+          Resource: 'arn:aws:s3:::aws-task-csv-bucket'
         - Effect: 'Allow'
-          Action:
-            - 's3:*'
+          Action: 's3:*'
+          Resource: 'arn:aws:s3:::aws-task-csv-bucket/*'
+        - Effect: 'Allow'
+          Action: 'sqs:*'
           Resource:
-            - 'arn:aws:s3:::aws-task-csv-bucket/*'
+            - Fn::GetAtt: [SQSQueue, Arn]
+        - Effect: 'Allow'
+          Action: 'sns:*'
+          Resource:
+            Ref: SNSTopic
 
   environment:
     host: console-created-instance.c0hjjbisikru.eu-west-1.rds.amazonaws.com
@@ -27,6 +32,28 @@ provider:
     database: console_db
     user: postgres
     password: JUNXjOHlOItsXOmtBH5X
+    SQS_URL:
+      Ref: SQSQueue
+    SNS_ARN:
+      Ref: SNSTopic
+
+resources:
+  Resources:
+    SQSQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: catalogItemsQueue
+    SNSTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: createProductTopic
+    SNSSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Endpoint: yan.test.aws@gmail.com
+        Protocol: email
+        TopicArn:
+          Ref: SNSTopic
 
 functions:
   importProductsFile:
@@ -49,3 +76,12 @@ functions:
           rules:
             - prefix: uploaded/
           existing: true
+  catalogBatchProcess:
+    handler: handler.catalogBatchProcess
+    events:
+      - sqs:
+          batchSize: 5
+          arn:
+            Fn::GetAtt:
+              - SQSQueue
+              - Arn

@@ -1,0 +1,774 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "The AWS CloudFormation template for this Serverless application",
+  "Resources": {
+    "ServerlessDeploymentBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ServerlessDeploymentBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "ServerlessDeploymentBucket"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      },
+                      "/*"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      }
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ImportProductsFileLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/import-service-dev-importProductsFile"
+      }
+    },
+    "ImportFileParserLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/import-service-dev-importFileParser"
+      }
+    },
+    "CatalogBatchProcessLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/import-service-dev-catalogBatchProcess"
+      }
+    },
+    "IamRoleLambdaExecution": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  "import-service",
+                  "dev",
+                  "lambda"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:CreateLogGroup"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/import-service-dev*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/import-service-dev*:*:*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:ListBucket"
+                  ],
+                  "Resource": "arn:aws:s3:::aws-task-csv-bucket"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:*"
+                  ],
+                  "Resource": "arn:aws:s3:::aws-task-csv-bucket/*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:*"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "SQSQueue",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sns:*"
+                  ],
+                  "Resource": {
+                    "Ref": "SNSTopic"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "SQSQueue",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "Path": "/",
+        "RoleName": {
+          "Fn::Join": [
+            "-",
+            [
+              "import-service",
+              "dev",
+              {
+                "Ref": "AWS::Region"
+              },
+              "lambdaRole"
+            ]
+          ]
+        }
+      }
+    },
+    "ImportProductsFileLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/import-service/dev/1621762068002-2021-05-23T09:27:48.002Z/import-service.zip"
+        },
+        "Handler": "handler.importProductsFile",
+        "Runtime": "nodejs12.x",
+        "FunctionName": "import-service-dev-importProductsFile",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Environment": {
+          "Variables": {
+            "host": "console-created-instance.c0hjjbisikru.eu-west-1.rds.amazonaws.com",
+            "port": "5432",
+            "database": "console_db",
+            "user": "postgres",
+            "password": "JUNXjOHlOItsXOmtBH5X",
+            "SQS_URL": {
+              "Ref": "SQSQueue"
+            },
+            "SNS_ARN": {
+              "Ref": "SNSTopic"
+            }
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "ImportProductsFileLogGroup"
+      ]
+    },
+    "ImportFileParserLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/import-service/dev/1621762068002-2021-05-23T09:27:48.002Z/import-service.zip"
+        },
+        "Handler": "handler.importFileParser",
+        "Runtime": "nodejs12.x",
+        "FunctionName": "import-service-dev-importFileParser",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Environment": {
+          "Variables": {
+            "host": "console-created-instance.c0hjjbisikru.eu-west-1.rds.amazonaws.com",
+            "port": "5432",
+            "database": "console_db",
+            "user": "postgres",
+            "password": "JUNXjOHlOItsXOmtBH5X",
+            "SQS_URL": {
+              "Ref": "SQSQueue"
+            },
+            "SNS_ARN": {
+              "Ref": "SNSTopic"
+            }
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "ImportFileParserLogGroup"
+      ]
+    },
+    "CatalogBatchProcessLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/import-service/dev/1621762068002-2021-05-23T09:27:48.002Z/import-service.zip"
+        },
+        "Handler": "handler.catalogBatchProcess",
+        "Runtime": "nodejs12.x",
+        "FunctionName": "import-service-dev-catalogBatchProcess",
+        "MemorySize": 1024,
+        "Timeout": 6,
+        "Environment": {
+          "Variables": {
+            "host": "console-created-instance.c0hjjbisikru.eu-west-1.rds.amazonaws.com",
+            "port": "5432",
+            "database": "console_db",
+            "user": "postgres",
+            "password": "JUNXjOHlOItsXOmtBH5X",
+            "SQS_URL": {
+              "Ref": "SQSQueue"
+            },
+            "SNS_ARN": {
+              "Ref": "SNSTopic"
+            }
+          }
+        },
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "CatalogBatchProcessLogGroup"
+      ]
+    },
+    "ImportProductsFileLambdaVersionMEDmUmwmiUOZgaXVNokT5AHQPMH8AVM13VZAwliqPY": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "ImportProductsFileLambdaFunction"
+        },
+        "CodeSha256": "9PVToXOe/yqPrftg7jJOIhwKxa6kjuZqs+8eRF2oYa4="
+      }
+    },
+    "ImportFileParserLambdaVersionssDJpVR0MH1j9W0omfEKOzZFLQGOGXiZOPQ2zatoo": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "ImportFileParserLambdaFunction"
+        },
+        "CodeSha256": "9PVToXOe/yqPrftg7jJOIhwKxa6kjuZqs+8eRF2oYa4="
+      }
+    },
+    "CatalogBatchProcessLambdaVersionBzbIbifHdeQ9IqSsRoYLiKEUxgZ0W5jTWPBlXE0": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "CatalogBatchProcessLambdaFunction"
+        },
+        "CodeSha256": "9PVToXOe/yqPrftg7jJOIhwKxa6kjuZqs+8eRF2oYa4="
+      }
+    },
+    "ImportFileParserCustomS31": {
+      "Type": "Custom::S3",
+      "Version": 1,
+      "DependsOn": [
+        "ImportFileParserLambdaFunction",
+        "CustomDashresourceDashexistingDashs3LambdaFunction"
+      ],
+      "Properties": {
+        "ServiceToken": {
+          "Fn::GetAtt": [
+            "CustomDashresourceDashexistingDashs3LambdaFunction",
+            "Arn"
+          ]
+        },
+        "FunctionName": "import-service-dev-importFileParser",
+        "BucketName": "aws-task-csv-bucket",
+        "BucketConfigs": [
+          {
+            "Event": "s3:ObjectCreated:*",
+            "Rules": [
+              {
+                "Prefix": "uploaded/"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "IamRoleCustomResourcesLambdaExecution": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "lambda.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": {
+              "Fn::Join": [
+                "-",
+                [
+                  "dev",
+                  "import-service",
+                  "custom-resources-lambda"
+                ]
+              ]
+            },
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      ":",
+                      [
+                        "arn",
+                        {
+                          "Ref": "AWS::Partition"
+                        },
+                        "s3",
+                        "",
+                        "",
+                        "aws-task-csv-bucket"
+                      ]
+                    ]
+                  },
+                  "Action": [
+                    "s3:PutBucketNotification",
+                    "s3:GetBucketNotification"
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Resource": {
+                    "Fn::Join": [
+                      ":",
+                      [
+                        "arn",
+                        {
+                          "Ref": "AWS::Partition"
+                        },
+                        "lambda",
+                        {
+                          "Ref": "AWS::Region"
+                        },
+                        {
+                          "Ref": "AWS::AccountId"
+                        },
+                        "function",
+                        "*"
+                      ]
+                    ]
+                  },
+                  "Action": [
+                    "lambda:AddPermission",
+                    "lambda:RemovePermission"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "CustomDashresourceDashexistingDashs3LambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/import-service/dev/1621762068002-2021-05-23T09:27:48.002Z/custom-resources.zip"
+        },
+        "FunctionName": "import-service-dev-custom-resource-existing-s3",
+        "Handler": "s3/handler.handler",
+        "MemorySize": 1024,
+        "Runtime": "nodejs12.x",
+        "Timeout": 180,
+        "Role": {
+          "Fn::GetAtt": [
+            "IamRoleCustomResourcesLambdaExecution",
+            "Arn"
+          ]
+        }
+      },
+      "DependsOn": [
+        "IamRoleCustomResourcesLambdaExecution"
+      ]
+    },
+    "ApiGatewayRestApi": {
+      "Type": "AWS::ApiGateway::RestApi",
+      "Properties": {
+        "Name": "dev-import-service",
+        "EndpointConfiguration": {
+          "Types": [
+            "EDGE"
+          ]
+        },
+        "Policy": ""
+      }
+    },
+    "ApiGatewayResourceImport": {
+      "Type": "AWS::ApiGateway::Resource",
+      "Properties": {
+        "ParentId": {
+          "Fn::GetAtt": [
+            "ApiGatewayRestApi",
+            "RootResourceId"
+          ]
+        },
+        "PathPart": "import",
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        }
+      }
+    },
+    "ApiGatewayMethodImportOptions": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "AuthorizationType": "NONE",
+        "HttpMethod": "OPTIONS",
+        "MethodResponses": [
+          {
+            "StatusCode": "200",
+            "ResponseParameters": {
+              "method.response.header.Access-Control-Allow-Origin": true,
+              "method.response.header.Access-Control-Allow-Headers": true,
+              "method.response.header.Access-Control-Allow-Methods": true
+            },
+            "ResponseModels": {}
+          }
+        ],
+        "RequestParameters": {},
+        "Integration": {
+          "Type": "MOCK",
+          "RequestTemplates": {
+            "application/json": "{statusCode:200}"
+          },
+          "ContentHandling": "CONVERT_TO_TEXT",
+          "IntegrationResponses": [
+            {
+              "StatusCode": "200",
+              "ResponseParameters": {
+                "method.response.header.Access-Control-Allow-Origin": "'*'",
+                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'",
+                "method.response.header.Access-Control-Allow-Methods": "'OPTIONS,GET'"
+              },
+              "ResponseTemplates": {
+                "application/json": "#set($origin = $input.params(\"Origin\"))\n#if($origin == \"\") #set($origin = $input.params(\"origin\")) #end\n#if($origin.matches(\".+\")) #set($context.responseOverride.header.Access-Control-Allow-Origin = $origin) #end"
+              }
+            }
+          ]
+        },
+        "ResourceId": {
+          "Ref": "ApiGatewayResourceImport"
+        },
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        }
+      }
+    },
+    "ApiGatewayMethodImportGet": {
+      "Type": "AWS::ApiGateway::Method",
+      "Properties": {
+        "HttpMethod": "GET",
+        "RequestParameters": {
+          "method.request.querystring.name": true
+        },
+        "ResourceId": {
+          "Ref": "ApiGatewayResourceImport"
+        },
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        },
+        "ApiKeyRequired": false,
+        "AuthorizationType": "NONE",
+        "Integration": {
+          "IntegrationHttpMethod": "POST",
+          "Type": "AWS_PROXY",
+          "Uri": {
+            "Fn::Join": [
+              "",
+              [
+                "arn:",
+                {
+                  "Ref": "AWS::Partition"
+                },
+                ":apigateway:",
+                {
+                  "Ref": "AWS::Region"
+                },
+                ":lambda:path/2015-03-31/functions/",
+                {
+                  "Fn::GetAtt": [
+                    "ImportProductsFileLambdaFunction",
+                    "Arn"
+                  ]
+                },
+                "/invocations"
+              ]
+            ]
+          }
+        },
+        "MethodResponses": []
+      }
+    },
+    "ApiGatewayDeployment1621762060033": {
+      "Type": "AWS::ApiGateway::Deployment",
+      "Properties": {
+        "RestApiId": {
+          "Ref": "ApiGatewayRestApi"
+        },
+        "StageName": "dev"
+      },
+      "DependsOn": [
+        "ApiGatewayMethodImportOptions",
+        "ApiGatewayMethodImportGet"
+      ]
+    },
+    "ImportProductsFileLambdaPermissionApiGateway": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "ImportProductsFileLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Join": [
+            "",
+            [
+              "arn:",
+              {
+                "Ref": "AWS::Partition"
+              },
+              ":execute-api:",
+              {
+                "Ref": "AWS::Region"
+              },
+              ":",
+              {
+                "Ref": "AWS::AccountId"
+              },
+              ":",
+              {
+                "Ref": "ApiGatewayRestApi"
+              },
+              "/*/*"
+            ]
+          ]
+        }
+      }
+    },
+    "CatalogBatchProcessEventSourceMappingSQSSQSQueue": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "DependsOn": [
+        "IamRoleLambdaExecution"
+      ],
+      "Properties": {
+        "BatchSize": 5,
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "SQSQueue",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Fn::GetAtt": [
+            "CatalogBatchProcessLambdaFunction",
+            "Arn"
+          ]
+        },
+        "Enabled": true
+      }
+    },
+    "SQSQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": "catalogItemsQueue"
+      }
+    },
+    "SNSTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": "createProductTopic"
+      }
+    },
+    "SNSSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Properties": {
+        "Endpoint": "yan.test.aws@gmail.com",
+        "Protocol": "email",
+        "TopicArn": {
+          "Ref": "SNSTopic"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "ServerlessDeploymentBucketName": {
+      "Value": {
+        "Ref": "ServerlessDeploymentBucket"
+      }
+    },
+    "ImportProductsFileLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "ImportProductsFileLambdaVersionMEDmUmwmiUOZgaXVNokT5AHQPMH8AVM13VZAwliqPY"
+      }
+    },
+    "ImportFileParserLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "ImportFileParserLambdaVersionssDJpVR0MH1j9W0omfEKOzZFLQGOGXiZOPQ2zatoo"
+      }
+    },
+    "CatalogBatchProcessLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "CatalogBatchProcessLambdaVersionBzbIbifHdeQ9IqSsRoYLiKEUxgZ0W5jTWPBlXE0"
+      }
+    },
+    "ServiceEndpoint": {
+      "Description": "URL of the service endpoint",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "https://",
+            {
+              "Ref": "ApiGatewayRestApi"
+            },
+            ".execute-api.",
+            {
+              "Ref": "AWS::Region"
+            },
+            ".",
+            {
+              "Ref": "AWS::URLSuffix"
+            },
+            "/dev"
+          ]
+        ]
+      }
+    }
+  }
+}
