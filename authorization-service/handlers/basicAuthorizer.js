@@ -28,21 +28,11 @@ const handler = async (event, cxt, cb) => {
       const policy = generatePolicy(encodedCreds, event.methodArn, effect);
 
       cb(null, policy);
-
-      if (effect === 'Deny') {
-        return {
-          statusCode: 403
-        };
-      }
-    } catch {
-      return {
-        statusCode: 403
-      };
+    } catch ({ message }) {
+      cb(`Unauthorized ${message}`);
     }
   } else {
-    return {
-      statusCode: 401
-    };
+    cb(`Unauthorized`);
   }
 };
 
