@@ -2,8 +2,7 @@ const middy = require('middy');
 const { cors } = require('middy/middlewares');
 const { generatePolicy } = require('../helpers/generatePolicy');
 
-const handler = async (event, cxt, cb) => {
-  console.log(event);
+const handler = async (event, _, cb) => {
   if (event['type'] === 'TOKEN') {
     try {
       const { authorizationToken } = event;

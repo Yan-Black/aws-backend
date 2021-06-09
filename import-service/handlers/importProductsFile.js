@@ -20,7 +20,6 @@ const handler = async (event) => {
 
     let statusCode = 200;
     let signedUrl = '';
-    let message = '';
 
     await new Promise((res, rej) => {
       s3.getSignedUrl('putObject', params, (err, url) => {
@@ -32,12 +31,18 @@ const handler = async (event) => {
       })
       .catch(({ message }) => {
         statusCode = 500;
-        message = message;
+        console.log(message);
       });
+
+    console.log(`received signed url: ${signedUrl}`);
 
     const response = {
       statusCode,
-      body: JSON.stringify({ signedUrl, message })
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Credentials': true
+      },
+      body: signedUrl
     };
 
     return response;
